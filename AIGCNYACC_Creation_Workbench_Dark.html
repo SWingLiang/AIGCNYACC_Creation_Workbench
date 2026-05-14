@@ -88,6 +88,11 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:-apple-s
 .cb-api{font-size:var(--fxs);color:var(--ink3)}
 .cb-main{font-size:var(--fxs);padding:2px 6px;border-radius:3px;background:var(--amlt);color:var(--amdk);border:1px solid var(--amber);flex-shrink:0}
 .lsec-div{height:1px;background:var(--bd);margin:6px 12px}
+.drawer{margin-top:7px;border:1px solid var(--bd);border-radius:8px;background:var(--bg3);overflow:hidden}
+.drawer-bd{display:none;padding:7px 8px;border-top:1px solid var(--bd)}
+.drawer.open .drawer-bd{display:block}
+.drawer-chip{display:inline-flex;align-items:center;padding:3px 8px;border-radius:16px;border:1px solid var(--bd2);font-size:var(--fxs);margin:2px;cursor:pointer;color:var(--ink2)}
+.drawer-chip.active{font-weight:600}
 
 /* mini checklist */
 .clr{display:flex;align-items:center;gap:6px;padding:3px 2px;font-size:var(--f);color:var(--ink2);cursor:pointer;user-select:none}
@@ -144,7 +149,6 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:-apple-s
 .cap-hdr-dot{width:8px;height:8px;border-radius:50%}
 .cap-hdr-name{font-size:14px;font-weight:600;color:var(--ink)}
 .api-badge{font-size:var(--fxs);padding:2px 8px;border-radius:4px;background:var(--bg3);border:1px solid var(--bd2);color:var(--ink3)}
-.tpl-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px}
 .tpl-chip{padding:4px 11px;border-radius:20px;border:1px solid var(--bd2);font-size:var(--f);cursor:pointer;color:var(--ink2);background:var(--bg3);transition:all .12s;user-select:none}
 .tpl-chip:hover{border-color:var(--bd);background:var(--bg4)}
 .tpl-chip.active{font-weight:600;border-color:currentColor}
@@ -272,11 +276,6 @@ html,body{height:100%;background:var(--bg);color:var(--ink);font-family:-apple-s
   <div class="lsec">
     <div class="lsec-lbl">本赛项生成能力</div>
     <div id="CAPLIST"></div>
-  </div>
-  <div class="lsec-div"></div>
-  <div class="lsec">
-    <div class="lsec-lbl">材料清单</div>
-    <div id="CLMINI"></div>
   </div>
   <div class="insp">
     <div class="ihd">
@@ -486,7 +485,7 @@ function render(){
   $('LE').innerHTML=e.id+' · '+e.name+' <i class="ti ti-chevron-down" style="font-size:10px"></i>';
   $('SEN').textContent=e.name;
   $('SID').textContent=e.id+' · '+GRADES[st.grade]+'组';
-  renderCaps(e); renderClMini(); renderTabs(e); renderPanel();
+  renderCaps(e); renderTabs(e); renderPanel();
   updProg(); checkExport();
   var m=CAP_META[st.capKey];
   $('ST').textContent='火山引擎 '+(m?m.api:'—')+' 已就绪 · '+e.id;
@@ -496,24 +495,27 @@ function renderCaps(e){
   $('CAPLIST').innerHTML=e.caps.map(function(c){
     var m=CAP_META[c]; if(!m) return'';
     var isMain=c===e.main; var isActive=c===st.capKey;
-    return'<button class="cap-btn'+(isActive?' active':'')+'" onclick="switchCap(\''+c+'\')">'
+    var tNow=tplActive[c]||((m.tpls||[])[0]||'');
+    var chips=(m.tpls||[]).map(function(t){
+      return '<span class="drawer-chip'+(t===tNow?' active':'')+'" style="'+(t===tNow?('border-color:'+m.color+';color:'+m.color):'')+'" onclick="event.stopPropagation();pickTplDrawer(\''+c+'\',\''+t+'\')">'+t+'</span>';
+    }).join('');
+    return'<div class="drawer'+(isActive?' open':'')+'" id="DR-'+c+'">'
+      +'<button class="cap-btn'+(isActive?' active':'')+'" onclick="switchCap(\''+c+'\');toggleDrawer(\''+c+'\')">'
       +'<span class="cb-dot" style="background:'+m.color+'"></span>'
       +'<span class="cb-inf"><div class="cb-name">'+m.label+'</div><div class="cb-api">'+m.api+'</div></span>'
-      +(isMain?'<span class="cb-main">主</span>':'')+'</button>';
+      +(isMain?'<span class="cb-main">主</span>':'')
+      +'<i class="ti ti-chevron-down" style="font-size:10px;color:var(--ink3)"></i></button>'
+      +'<div class="drawer-bd">'+chips+'</div></div>';
   }).join('');
 }
-
-function renderClMini(){
-  $('CLMINI').innerHTML=CHECKLIST.map(function(c){
-    var done=clState[c.key];
-    var isWarn=c.key==='aigc'&&genCount>0&&!done;
-    var cls=done?'done':isWarn?'warn':'';
-    var icon=done?'ti-circle-check':isWarn?'ti-alert-circle':'ti-circle';
-    return'<div class="clr '+cls+'" onclick="togClMini(\''+c.key+'\')">'
-      +'<i class="ti '+icon+'"></i>'+c.label+'</div>';
-  }).join('');
+function toggleDrawer(c){
+  var d=$('DR-'+c); if(!d) return;
+  d.classList.toggle('open');
 }
-function togClMini(k){clState[k]=!clState[k];renderClMini();updProg();checkExport();}
+function pickTplDrawer(c,t){
+  tplActive[c]=t; st.capKey=c;
+  renderCaps(ev()); renderTabs(ev()); renderPanel();
+}
 
 function renderTabs(e){
   $('TABS').innerHTML=e.caps.map(function(c){
@@ -540,23 +542,18 @@ function renderPanel(){
   var ml=mats.length?'\n【参考材料】'+mats.join('、'):'';
   var what=st.capKey==='code'?'交互逻辑与技术选型':st.capKey==='image'?'视觉风格与构图':st.capKey==='video'?'镜头叙事与节奏':st.capKey==='audio'?'音乐情绪与结构':'叙事结构与语言风格';
   var prompt='【赛项】'+GRADES[st.grade]+'组 · '+e.name+'\n【工具】'+m.label+' · '+m.api+'\n【模板】'+actTpl+ml+'\n\n请描述你的主题立意、'+what+'，以及与AI协作的具体环节。';
-  var tplHtml=tpls.map(function(t){
-    var isAct=t===actTpl;
-    var style=isAct?(' style="border-color:'+m.color+';color:'+m.color+'"'):'';
-    return'<span class="tpl-chip'+(isAct?' active':'')+'"'+style+' onclick="pickTpl(\''+t+'\',this)">'+t+'</span>';
-  }).join('');
   $('PNL').innerHTML=
     '<div class="cap-hdr"><span class="cap-hdr-dot" style="background:'+m.color+'"></span>'
     +'<span class="cap-hdr-name">'+m.label+'</span><span class="api-badge">'+m.api+'</span></div>'
-    +'<div class="tpl-row" id="TR">'+tplHtml+'</div>'
+    +'<div class="rb" id="MATV" style="margin-top:0">中部仅保留【参考材料】上传入口与提示词输入；右侧保持材料缩略与清单。</div>'
     +'<textarea class="pta" id="PTA" oninput="updCC()">'+prompt+'</textarea>'
     +'<div class="prow">'
       +'<button class="bgen" onclick="generate()" style="background:'+m.color+'">'
-        +'<i class="ti ti-sparkles" style="font-size:13px"></i>调用 '+m.api
+        +'<i class="ti ti-sparkles" style="font-size:13px"></i>(调用山火)生成'
       +'</button>'
-      +'<button class="bsm" onclick="aiOpt()"><i class="ti ti-wand" style="font-size:12px"></i>优化提示词 ↗</button>'
+      +'<button class="bsm" onclick="aiOpt()"><i class="ti ti-wand" style="font-size:12px"></i>优化提示词</button>'
     +'</div>'
-    +'<div class="rb" id="RB" style="color:var(--ink3)">等待生成… 选择上方模板或手动输入后点击调用</div>'
+    +'<div class="rb" id="RB" style="color:var(--ink3)">等待生成… 输入咒语描述后点击“调用山火生成”</div>'
     +'<div class="hint-box"><i class="ti ti-info-circle" style="font-size:12px;vertical-align:-1px;margin-right:4px"></i>'+m.hint+'</div>';
   // char count
   var cc=document.createElement('div');cc.style.cssText='font-size:9px;color:var(--ink3);text-align:right;margin-top:4px';cc.id='CC';cc.textContent=prompt.length+' 字';
@@ -590,7 +587,7 @@ function generate(){
     if(genCount>=3) clState.aigc=true;
     setClDone('main');
     if(clState.aigc) setClDone('aigc');
-    renderClMini(); updProg(); checkExport();
+    updProg(); checkExport();
     $('AN').textContent='('+Math.min(genCount,3)+'/3)';
     var kw=tplActive[st.capKey]||(CAP_META[st.capKey].tpls[0]||'自定义');
     GH.unshift({tool:st.capKey,ev:ev().id,kw:kw,ver:'V'+genCount,time:now()});
@@ -629,7 +626,7 @@ function togCl(k){
   el.className='cli '+(clState[k]?'done':'idle');
   el.querySelector('i').className='ti ti-'+(clState[k]?'circle-check':'circle');
   if(k==='aigc'&&!clState[k]) $('AN').textContent='(0/3)';
-  renderClMini(); updProg(); checkExport();
+  updProg(); checkExport();
 }
 function updProg(){
   var done=Object.values(clState).filter(Boolean).length;
