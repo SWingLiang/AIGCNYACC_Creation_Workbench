@@ -1,8 +1,0 @@
-ARK_API_KEY=ark-ac2f0bdf-418d-4e02-a326-4a7049011c1c-b993b
-ARK_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
-# Agent文本模型
-ARK_MODEL=ep-20260521040644-p5wfn
-# 图像生成
-ARK_IMAGE_MODEL=ep-20260521055509-x2kch
-# 视频生成
-ARK_VIDEO_MODEL=ep-20260521055333-gqwft
